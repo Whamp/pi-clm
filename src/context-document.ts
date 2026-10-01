@@ -34,6 +34,8 @@ interface ParsedDocument {
 	preamble: string;
 	duplicateIds: string[];
 	malformedCurrentHeaders: string[];
+	/** Header-shaped lines whose document nonce does not match the current snapshot; their blocks are not applied (stale nonce). */
+	staleNonceHeaders: string[];
 }
 
 function normalizeJson(value: unknown): unknown {
@@ -219,6 +221,11 @@ export function renderContextDocument(
 	};
 }
 
+/** Bounds a mirror line for inclusion in a rejection reason or diagnostic; keeps a complete standalone header intact. */
+function truncateDiagnosticLine(line: string): string {
+	return line.length > 160 ? `${line.slice(0, 157)}...` : line;
+}
+
 function parseDocument(text: string, snapshot: ContextDocumentSnapshot): ParsedDocument {
 	const metadata = META_RE.exec(text);
 	const blockRe = new RegExp(
@@ -253,6 +260,20 @@ function parseDocument(text: string, snapshot: ContextDocumentSnapshot): ParsedD
 		.map((line) => line.trim())
 		.filter((line) => line.startsWith(currentPrefix) && !validHeaderLines.has(line));
 
+	// A header copied from an earlier render carries a stale document nonce: it is
+	// well-formed but matches neither blockRe (wrong nonce) nor currentPrefix, so it
+	// produces no block and its body is silently absorbed into the preceding block.
+	// Disjoint from malformedCurrentHeaders, which only sees the current nonce.
+	const staleNonceHeaderRe =
+		/^\[\[CTX_TURN document=([a-zA-Z0-9-]+) index=\d+ role=[A-Za-z][A-Za-z0-9_-]* id=[a-zA-Z0-9-]+ protected=(?:true|false)\]\]$/;
+	const staleNonceHeaders = text
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => {
+			const match = staleNonceHeaderRe.exec(line);
+			return match !== null && match[1] !== snapshot.documentId;
+		});
+
 	const metadataEnd = metadata ? metadata[0].length : 0;
 	const firstBlockStart = matches[0]?.index ?? text.length;
 	const preamble = text
@@ -271,6 +292,7 @@ function parseDocument(text: string, snapshot: ContextDocumentSnapshot): ParsedD
 		preamble,
 		duplicateIds,
 		malformedCurrentHeaders,
+		staleNonceHeaders,
 	};
 }
 
@@ -568,6 +590,14 @@ export function applyContextDocument(
 	}
 
 	const diagnostics: string[] = [];
+	// A stale-nonce header is not an error worth rejecting the whole edit over, but
+	// the model must learn that the block it addressed did not land; the diagnostic
+	// is appended to the acceptance notice on the next turn (index.ts).
+	for (const line of parsed.staleNonceHeaders.slice(0, 3)) {
+		diagnostics.push(
+			`Ignored stale-nonce header from an earlier context revision: ${JSON.stringify(truncateDiagnosticLine(line))}; that block was not applied. Copy the header from the current mirror if you meant to edit it.`,
+		);
+	}
 	const candidate: LiveContextMessage[] = [];
 	const candidateOrigins: Array<{ sourceIndex?: number; kind: ContextEditSourceKind | "added" }> = [];
 	const removedSourceIndexes = new Set<number>();

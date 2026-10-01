@@ -335,6 +335,22 @@ describe("nonce-bound framing", () => {
 		assert.equal(result.accepted, false);
 		assert.match(result.reason ?? "", /malformed headers/);
 	});
+
+	test("a header with a stale document nonce is ignored with a diagnostic", () => {
+		const messages = conversation();
+		const snapshot = renderContextDocument(messages);
+		const staleHeader = snapshot.blocks[1].header.replace(
+			`document=${snapshot.documentId} `,
+			"document=00000000deadbeef ",
+		);
+		const edited = snapshot.text.replace(snapshot.blocks[1].header, staleHeader);
+		assert.notEqual(edited, snapshot.text);
+		const result = applyContextDocument(edited, snapshot, { requireShrink: false });
+		assert.equal(result.accepted, true);
+		assert.equal(result.messages.length, messages.length - 1);
+		assert.match(result.diagnostics.join(" "), new RegExp(snapshot.blocks[1].id));
+		assert.match(result.diagnostics.join(" "), /stale-nonce header/);
+	});
 });
 
 describe("opaque content preservation", () => {
