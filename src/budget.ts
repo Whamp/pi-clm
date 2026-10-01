@@ -191,27 +191,36 @@ export function budgetSummaryLine(reading: BudgetReading): string {
 	return parts.join(" · ");
 }
 
-/** The model-facing reminder. Always states both measurements, the budget, and what happens at overflow. */
+/**
+ * The model-facing reminder. Always states both measurements, the budget, and what
+ * happens at overflow, and carries the consolidation policy: it is the highest-salience
+ * text in the session, so the action belongs here rather than only in standing guidance.
+ * The calibration multiplier stays in the status line, not here — it is estimation
+ * bookkeeping the model never acts on.
+ */
 export function budgetNoticeText(reading: BudgetReading, tier: BudgetTier, mirrorPath: string | undefined): string {
 	const governing = governingTokens(reading);
 	const remaining = Math.max(0, reading.budget - governing);
 	const where = mirrorPath ?? "the context mirror";
-	const calibrated = reading.calibration !== undefined && reading.calibration > 1.005 ? ` (calibrated ×${reading.calibration.toFixed(2)} from provider counts)` : "";
-	const excludes = `${calibrated}${reading.estimateExcludes ? `, excluding ${reading.estimateExcludes}` : ""}`;
+	const excludes = reading.estimateExcludes ? `, excluding ${reading.estimateExcludes}` : "";
 	const measurement =
 		reading.observed === undefined
 			? `estimated ${formatTokens(reading.estimated)} tokens for the next request${excludes}; provider-reported size of the previous request unknown`
 			: `estimated ${formatTokens(reading.estimated)} tokens for the next request${excludes}; the provider reported ${formatTokens(reading.observed)} for the previous one${reading.observedStale ? ", before your last accepted edit" : ""}`;
+	const consolidate =
+		`If a read is in flight, finish it. If exploration is done or nearly done, consolidate now: ` +
+		`extract the durable facts, decisions, and citations into ${where} and drop the raw blocks — ` +
+		`one pass typically reclaims most of the exploration weight. Never truncate or skip reads to save space.`;
 	if (tier.label === "budget-reserve") {
 		return (
 			`[CLM BUDGET] Context is at ${formatTokens(governing)} of a ${formatTokens(reading.budget)}-token budget ` +
 			`(${measurement}). Only ${formatTokens(remaining)} tokens remain, which is inside the ${formatTokens(reading.reserve)}-token generation reserve. ` +
-			`Edit ${where} now to free space. The budget is a target, not enforced: the request will still be sent and may overflow the provider's actual window.`
+			`${consolidate} The budget is a target, not enforced: the request will still be sent and may overflow the provider's actual window.`
 		);
 	}
 	return (
 		`[CLM BUDGET] Context crossed ${tier.label} of a ${formatTokens(reading.budget)}-token budget: ${measurement}. ` +
-		`${formatTokens(remaining)} tokens remain. You may reorganize ${where} at any time; the final reminder comes at ${formatTokens(reading.budget - reading.reserve)} tokens.`
+		`${formatTokens(remaining)} tokens remain. ${consolidate} The final reminder comes at ${formatTokens(reading.budget - reading.reserve)} tokens.`
 	);
 }
 

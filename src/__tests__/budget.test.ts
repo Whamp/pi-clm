@@ -110,6 +110,8 @@ describe("budget text", () => {
 		assert.match(text, /15,000 tokens remain/);
 		assert.match(text, /final reminder comes at 29,952 tokens/);
 		assert.match(text, /\/tmp\/m\/LIVE_CONTEXT\.md/);
+		assert.match(text, /If a read is in flight, finish it/);
+		assert.match(text, /one pass typically reclaims most of the exploration weight/);
 	});
 	test("notice says when the observed size is unknown instead of implying a measurement", () => {
 		const text = budgetNoticeText(reading(17_000), tiers[0]!, undefined);
@@ -121,7 +123,7 @@ describe("budget text", () => {
 		assert.match(text, /^\[CLM BUDGET\] Context is at 30,500 of a 32,000-token budget/);
 		assert.match(text, /Only 1,500 tokens remain/);
 		assert.match(text, /2,048-token generation reserve/);
-		assert.match(text, /Edit \/m now/);
+		assert.match(text, /into \/m and drop the raw blocks/);
 	});
 	test("summary line separates the three numbers and names the budget source", () => {
 		assert.equal(
@@ -159,9 +161,10 @@ describe("estimate calibrator", () => {
 		c.record(0, 0);
 		assert.equal(c.observe({ tokens: 100, index: 0 }), 1);
 	});
-	test("notice and status show the calibration when it is above 1", () => {
+	test("the notice keeps the calibration multiplier invisible; the status line shows it", () => {
 		const text = budgetNoticeText({ ...reading(17_000, 16_000), calibration: 1.83 }, tiers[0]!, undefined);
-		assert.match(text, /estimated 17,000 tokens for the next request \(calibrated ×1\.83 from provider counts\); the provider/);
+		assert.match(text, /estimated 17,000 tokens for the next request; the provider/);
+		assert.doesNotMatch(text, /calibrated/);
 		assert.doesNotMatch(budgetNoticeText({ ...reading(17_000), calibration: 1 }, tiers[0]!, undefined), /calibrated/);
 		assert.match(budgetSummaryLine({ ...reading(1_000), calibration: 2 }), /estimated next request 1,000 \(×2\.00 calibrated\)/);
 	});
