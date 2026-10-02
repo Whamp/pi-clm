@@ -372,6 +372,7 @@ describe("nonce-bound framing", () => {
 		assert.doesNotMatch(warning, /not applied|earlier context revision/i,
 			"mixed warning must not claim retained content was discarded or infer an earlier revision");
 		assert.match(warning, /Unrecognized stale-nonce header/);
+		assert.match(warning, new RegExp(snapshot.blocks[2].id));
 		assert.match(warning, /text and following body/);
 		assert.match(warning, /message body.*notes/);
 		assert.match(warning, /copy.*current mirror/i);

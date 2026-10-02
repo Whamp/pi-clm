@@ -34,7 +34,6 @@ interface ParsedDocument {
 	preamble: string;
 	duplicateIds: string[];
 	malformedCurrentHeaders: string[];
-	/** Header-shaped lines whose document nonce does not match the current snapshot; their blocks are not applied (stale nonce). */
 	staleNonceHeaders: string[];
 }
 
@@ -221,7 +220,6 @@ export function renderContextDocument(
 	};
 }
 
-/** Bounds a mirror line for inclusion in a rejection reason or diagnostic; keeps a complete standalone header intact. */
 function truncateDiagnosticLine(line: string): string {
 	return line.length > 160 ? `${line.slice(0, 157)}...` : line;
 }
@@ -260,10 +258,6 @@ function parseDocument(text: string, snapshot: ContextDocumentSnapshot): ParsedD
 		.map((line) => line.trim())
 		.filter((line) => line.startsWith(currentPrefix) && !validHeaderLines.has(line));
 
-	// A header copied from an earlier render carries a stale document nonce: it is
-	// well-formed but matches neither blockRe (wrong nonce) nor currentPrefix, so it
-	// produces no block and its body is silently absorbed into the preceding block.
-	// Disjoint from malformedCurrentHeaders, which only sees the current nonce.
 	const staleNonceHeaderRe =
 		/^\[\[CTX_TURN document=([a-zA-Z0-9-]+) index=\d+ role=[A-Za-z][A-Za-z0-9_-]* id=[a-zA-Z0-9-]+ protected=(?:true|false)\]\]$/;
 	const staleNonceHeaders = text
@@ -515,6 +509,12 @@ export function applyContextDocument(
 	};
 
 	const parsed = parseDocument(editedText, snapshot);
+	const diagnostics: string[] = [];
+	for (const line of parsed.staleNonceHeaders.slice(0, 3)) {
+		diagnostics.push(
+			`Unrecognized stale-nonce header: ${JSON.stringify(truncateDiagnosticLine(line))}. It is not a recognized block boundary. Its text and following body may be incorporated into another message body or notes. Copy the header from the current mirror if you meant to edit that block.`,
+		);
+	}
 	const metadataLine = snapshot.text.split("\n")[0] ?? "";
 	// CLM: a file with no current block headers at all is the model replacing its whole
 	// context with free text (the paper's "collapse to a summary" move). Accept it as one
@@ -542,11 +542,12 @@ export function applyContextDocument(
 		}
 		candidate.push(contextNote(body, undefined, "notes"));
 		candidateOrigins.push({ kind: "added" });
-		return finalize(candidate, candidateOrigins, removedSourceIndexes, [
+		diagnostics.push(
 			"Accepted a headerless rewrite: every block was replaced by one notes block" +
 				(firstUserIndex >= 0 ? " after the first user turn" : "") +
 				". To edit blocks individually, keep the [[CTX_TURN ...]] headers.",
-		]);
+		);
+		return finalize(candidate, candidateOrigins, removedSourceIndexes, diagnostics);
 	}
 	// With a stable document the baseline digest still changes every render (new raw
 	// messages), so only the revision and nonce identify the document the model edited.
@@ -598,15 +599,6 @@ export function applyContextDocument(
 		);
 	}
 
-	const diagnostics: string[] = [];
-	// A stale-nonce header is not an error worth rejecting the whole edit over, but
-	// the model must learn that the block it addressed did not land; the diagnostic
-	// is appended to the acceptance notice on the next turn (index.ts).
-	for (const line of parsed.staleNonceHeaders.slice(0, 3)) {
-		diagnostics.push(
-			`Ignored stale-nonce header from an earlier context revision: ${JSON.stringify(truncateDiagnosticLine(line))}; that block was not applied. Copy the header from the current mirror if you meant to edit it.`,
-		);
-	}
 	const candidate: LiveContextMessage[] = [];
 	const candidateOrigins: Array<{ sourceIndex?: number; kind: ContextEditSourceKind | "added" }> = [];
 	const removedSourceIndexes = new Set<number>();
