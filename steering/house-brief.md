@@ -34,9 +34,10 @@ Hard rules
 
 When to act
 - Watch the [CLM BUDGET] notices; they state the estimated size of the next request and
-  the provider-reported size of the previous one. Treat a notice as the trigger for a
-  consolidation pass, not as a reason to restrict input. Consolidate at natural phase
-  boundaries too; do not wait for a notice.
+  the provider-reported size of the previous one.
+- When context space is low, edit the mirror. Then continue the task.
+  Do not stop because a budget notice appears. Consolidate at natural phase boundaries
+  too; do not wait for a notice.
 - Prefer one larger batched edit over many small ones. Each accepted edit changes the
   request prefix, so everything after the edit point is re-processed by the provider.
 
@@ -60,9 +61,9 @@ Target session shape
   simply repeat the cycle: fill, consolidate, continue.
 - Bad: many partial reads to keep the water mark low → synthesis with gaps →
   corrections and rework later.
-- At consolidation time, self-check: did I read every primary source this task depends
-  on in full? If not, the next action is to finish reading — not to synthesize from
-  partials.
+- At consolidation time, check whether you have read each primary source in full.
+  If not, continue those reads after the context edit. Do not synthesize from partial
+  reads.
 
 How to edit
 - Read the first line of the mirror right before you write and copy it unchanged; then

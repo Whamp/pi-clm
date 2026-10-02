@@ -102,7 +102,7 @@ describe("budget tracker", () => {
 });
 
 describe("budget text", () => {
-	test("notice labels estimated and observed separately and states the budget and remaining tokens", () => {
+	void test("notice labels estimated and observed separately and states the budget and remaining tokens", () => {
 		const text = budgetNoticeText(reading(17_000, 16_200), tiers[0]!, "/tmp/m/LIVE_CONTEXT.md");
 		assert.match(text, /^\[CLM BUDGET\] Context crossed 50% of a 32,000-token budget/);
 		assert.match(text, /estimated 17,000 tokens for the next request/);
@@ -111,19 +111,27 @@ describe("budget text", () => {
 		assert.match(text, /final reminder comes at 29,952 tokens/);
 		assert.match(text, /\/tmp\/m\/LIVE_CONTEXT\.md/);
 		assert.match(text, /If a read is in flight, finish it/);
-		assert.match(text, /one pass typically reclaims most of the exploration weight/);
+		assert.match(text, /When context space is low, edit \/tmp\/m\/LIVE_CONTEXT\.md\./);
+		assert.match(text, /Then continue the task\. Do not stop because a budget notice appears\./);
+		assert.match(text, /Never truncate or skip reads to save space/);
+		assert.doesNotMatch(text, /exploration is done or nearly done/);
 	});
 	test("notice says when the observed size is unknown instead of implying a measurement", () => {
 		const text = budgetNoticeText(reading(17_000), tiers[0]!, undefined);
 		assert.match(text, /provider-reported size of the previous request unknown/);
 		assert.match(text, /the context mirror/);
 	});
-	test("reserve notice is imperative and names the reserve", () => {
+	void test("reserve notice is imperative and names the reserve", () => {
 		const text = budgetNoticeText(reading(30_500, 30_100), tiers[3]!, "/m");
 		assert.match(text, /^\[CLM BUDGET\] Context is at 30,500 of a 32,000-token budget/);
 		assert.match(text, /Only 1,500 tokens remain/);
 		assert.match(text, /2,048-token generation reserve/);
 		assert.match(text, /into \/m and drop the raw blocks/);
+		assert.match(text, /If a read is in flight, finish it/);
+		assert.match(text, /When context space is low, edit \/m\./);
+		assert.match(text, /Then continue the task\. Do not stop because a budget notice appears\./);
+		assert.match(text, /Never truncate or skip reads to save space/);
+		assert.doesNotMatch(text, /exploration is done or nearly done/);
 	});
 	test("summary line separates the three numbers and names the budget source", () => {
 		assert.equal(
@@ -161,7 +169,7 @@ describe("estimate calibrator", () => {
 		c.record(0, 0);
 		assert.equal(c.observe({ tokens: 100, index: 0 }), 1);
 	});
-	test("the notice keeps the calibration multiplier invisible; the status line shows it", () => {
+	void test("the notice keeps the calibration multiplier invisible; the status line shows it", () => {
 		const text = budgetNoticeText({ ...reading(17_000, 16_000), calibration: 1.83 }, tiers[0]!, undefined);
 		assert.match(text, /estimated 17,000 tokens for the next request; the provider/);
 		assert.doesNotMatch(text, /calibrated/);

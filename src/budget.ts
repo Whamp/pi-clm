@@ -191,13 +191,7 @@ export function budgetSummaryLine(reading: BudgetReading): string {
 	return parts.join(" · ");
 }
 
-/**
- * The model-facing reminder. Always states both measurements, the budget, and what
- * happens at overflow, and carries the consolidation policy: it is the highest-salience
- * text in the session, so the action belongs here rather than only in standing guidance.
- * The calibration multiplier stays in the status line, not here — it is estimation
- * bookkeeping the model never acts on.
- */
+/** Model-facing reminder with both measurements, the budget, and the edit-and-continue policy. */
 export function budgetNoticeText(reading: BudgetReading, tier: BudgetTier, mirrorPath: string | undefined): string {
 	const governing = governingTokens(reading);
 	const remaining = Math.max(0, reading.budget - governing);
@@ -208,9 +202,10 @@ export function budgetNoticeText(reading: BudgetReading, tier: BudgetTier, mirro
 			? `estimated ${formatTokens(reading.estimated)} tokens for the next request${excludes}; provider-reported size of the previous request unknown`
 			: `estimated ${formatTokens(reading.estimated)} tokens for the next request${excludes}; the provider reported ${formatTokens(reading.observed)} for the previous one${reading.observedStale ? ", before your last accepted edit" : ""}`;
 	const consolidate =
-		`If a read is in flight, finish it. If exploration is done or nearly done, consolidate now: ` +
-		`extract the durable facts, decisions, and citations into ${where} and drop the raw blocks — ` +
-		`one pass typically reclaims most of the exploration weight. Never truncate or skip reads to save space.`;
+		`If a read is in flight, finish it. When context space is low, edit ${where}. ` +
+		`Extract the durable facts, decisions, and citations into ${where} and drop the raw blocks. ` +
+		`Then continue the task. Do not stop because a budget notice appears. ` +
+		`One pass typically reclaims most of the exploration weight. Never truncate or skip reads to save space.`;
 	if (tier.label === "budget-reserve") {
 		return (
 			`[CLM BUDGET] Context is at ${formatTokens(governing)} of a ${formatTokens(reading.budget)}-token budget ` +
