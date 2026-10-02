@@ -546,10 +546,6 @@ export function applyContextDocument(
 		return rejected(snapshot, beforeEstimate, `Mirror contains duplicate block IDs: ${parsed.duplicateIds.join(", ")}.`);
 	}
 	if (parsed.malformedCurrentHeaders.length > 0) {
-		// The typical offender is a body glued onto its header line, which can carry
-		// thousands of tokens. Truncate shown lines at 160 chars so the reason stays
-		// bounded while a complete standalone header (<= ~143 chars with a 64-hex
-		// nonce and full block id) is never cut; only glued-on body text is elided.
 		const shown = parsed.malformedCurrentHeaders
 			.slice(0, 3)
 			.map((line) => JSON.stringify(line.length > 160 ? `${line.slice(0, 157)}...` : line));
